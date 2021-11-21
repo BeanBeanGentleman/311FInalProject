@@ -1,5 +1,7 @@
 from sklearn.impute import KNNImputer
 from utils import *
+import os
+import numpy as np
 
 
 def knn_impute_by_user(matrix, valid_data, k):
@@ -38,6 +40,10 @@ def knn_impute_by_item(matrix, valid_data, k):
     # Implement the function as described in the docstring.             #
     #####################################################################
     acc = None
+    neighbours = KNNImputer(n_neighbors=k)
+    t_mat = np.transpose(neighbours.fit_transform(np.transpose(matrix)))
+    acc = sparse_matrix_evaluate(valid_data, t_mat)
+
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
@@ -60,7 +66,23 @@ def main():
     # the best performance and report the test accuracy with the        #
     # chosen k*.                                                        #
     #####################################################################
-    pass
+    k_values = [1, 6, 11, 16, 21, 26]
+    acc_u = []
+    acc_i = []
+    for k in k_values:
+        uaccuracy = knn_impute_by_user(sparse_matrix, val_data, k)
+        iaccuracy = knn_impute_by_item(sparse_matrix, val_data, k)
+        acc_u.append(uaccuracy)
+        acc_i.append(iaccuracy)
+    
+    best_u = np.argmax(acc_u)
+    best_i = np.argmax(acc_i)
+
+    ku = k_values[best_u]
+    ki = k_values[best_i]
+
+    print("When k is {}, test has the highest accuracy {}.".format(ku, acc_u[best_u]))
+    print("When k is {}, test has the highest accuracy {}.".format(ki, acc_i[best_i]))
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
