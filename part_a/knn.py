@@ -2,6 +2,7 @@ from sklearn.impute import KNNImputer
 from utils import *
 import os
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 def knn_impute_by_user(matrix, valid_data, k):
@@ -43,6 +44,7 @@ def knn_impute_by_item(matrix, valid_data, k):
     neighbours = KNNImputer(n_neighbors=k)
     t_mat = np.transpose(neighbours.fit_transform(np.transpose(matrix)))
     acc = sparse_matrix_evaluate(valid_data, t_mat)
+    print("Validation Accuracy: {}".format(acc))
 
     #####################################################################
     #                       END OF YOUR CODE                            #
@@ -83,6 +85,11 @@ def main():
 
     print("When k is {}, test has the highest accuracy {}.".format(ku, acc_u[best_u]))
     print("When k is {}, test has the highest accuracy {}.".format(ki, acc_i[best_i]))
+    
+    # plt.plot(k_values, acc_i, color='blue')
+    # plt.xlabel("K Value")
+    # plt.ylabel("Accuracy")
+    # plt.show()
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################

@@ -100,8 +100,8 @@ def irt(data, val_data, lr, iterations):
     :return: (theta, beta, val_acc_lst)
     """
     # TODO: Initialize theta and beta.
-    theta = np.random.rand(542)
-    beta = np.random.rand(1774)
+    theta = np.zeros(542)
+    beta = np.zeros(1774)
 
     val_acc_lst = []
     train_likelihood = []
@@ -158,21 +158,29 @@ def main():
 
     # learning_rate = [0.1, 0.05, 0.01, 0.005, 0.001]
     # iterations = [10, 20, 30, 50, 100]
+    # best_acc = 0
+    # best_iter = 10
+    # best_lr = 0.1
     # for lr in learning_rate:
     #     for iter in iterations:
     #         theta, beat, val_acc_lst, train_likelihood, val_likelihood = irt(train_data, val_data, lr, iter)
+    #         if val_acc_lst[-1] > best_acc:
+    #             best_acc = val_acc_lst[-1]
+    #             best_iter = iter
+    #             best_lr = lr
     #         print("Current lr: {}, iterations: {}, accuracy: {}".format(lr, iter, val_acc_lst[-1]))
-    # Best 0.01, 20
-    theta, beta, val_acc_lst, train_likelihood, val_likelihood = irt(train_data, val_data, 0.01, 20)
-    # plt.plot(train_likelihood, label='train')
-    # plt.plot(val_likelihood, label='val')
-    # plt.xlabel('iterations number')
-    # plt.ylabel('Loglikelihood')
-    # x_major_locator = MultipleLocator(1)
-    # ax = plt.gca()
-    # ax.xaxis.set_major_locator(x_major_locator)
-    # plt.legend()
-    # plt.show()
+    
+    # Best 0.005, 30
+    theta, beta, val_acc_lst, train_likelihood, val_likelihood = irt(train_data, val_data, 0.005, 30)
+    plt.plot(train_likelihood, label='train')
+    plt.plot(val_likelihood, label='val')
+    plt.xlabel('iterations number')
+    plt.ylabel('Loglikelihood')
+    x_major_locator = MultipleLocator(2)
+    ax = plt.gca()
+    ax.xaxis.set_major_locator(x_major_locator)
+    plt.legend()
+    plt.show()
     test_acc = evaluate(test_data, theta, beta)
     print("Test accuracy: ", test_acc)
     val_acc = evaluate(val_data, theta, beta)
