@@ -9,6 +9,8 @@ import torch.utils.data
 import numpy as np
 import torch
 
+import matplotlib.pyplot as plt
+
 
 def load_data(base_path="../data"):
     """ Load the data in PyTorch Tensor.
@@ -70,7 +72,9 @@ class AutoEncoder(nn.Module):
         # Implement the function as described in the docstring.             #
         # Use sigmoid activations for f and g.                              #
         #####################################################################
-        out = inputs
+
+        out = torch.sigmoid(self.g(inputs))
+        out = torch.sigmoid(self.h(out))
         #####################################################################
         #                       END OF YOUR CODE                            #
         #####################################################################
@@ -90,14 +94,17 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
     :param num_epoch: int
     :return: None
     """
-    # TODO: Add a regularizer to the cost function. 
-    
+    # TODO: Add a regularizer to the cost function.
+
     # Tell PyTorch you are training the model.
     model.train()
 
     # Define optimizers and loss function.
     optimizer = optim.SGD(model.parameters(), lr=lr)
     num_student = train_data.shape[0]
+    training = []
+    validation =[]
+    training_acc_list = []
 
     for epoch in range(0, num_epoch):
         train_loss = 0.
@@ -112,16 +119,42 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
             # Mask the target to only compute the gradient of valid entries.
             nan_mask = np.isnan(train_data[user_id].unsqueeze(0).numpy())
             target[0][nan_mask] = output[0][nan_mask]
-
-            loss = torch.sum((output - target) ** 2.)
+            loss = torch.sum((output - target) ** 2.) \
+                   + (0.5 * lamb * model.get_weight_norm())
             loss.backward()
 
             train_loss += loss.item()
             optimizer.step()
 
         valid_acc = evaluate(model, zero_train_data, valid_data)
+
+        training.append(train_loss)
+        # training_acc_list.append(evaluate(model, zero_train_data, train_data))
+        validation.append(valid_acc)
+        # training_acc_list.append(1)
+
         print("Epoch: {} \tTraining Cost: {:.6f}\t "
               "Valid Acc: {}".format(epoch, train_loss, valid_acc))
+
+    plt.figure(1)
+    x1 = np.arange(num_epoch)
+    y1 = training
+    plt.title('training')
+    plt.xlabel('num_epoch')
+    plt.ylabel('training loss')
+    plt.plot(x1, y1)
+    plt.savefig('./training loss.png')
+
+    plt.figure(2)
+    x2 = np.arange(num_epoch)
+    y2 = validation
+    plt.title('validation')
+    plt.xlabel('num_epoch')
+    plt.ylabel('validation loss')
+    plt.plot(x2, y2)
+    plt.savefig('./validation accuracy.png')
+
+
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
@@ -162,16 +195,27 @@ def main():
     # validation set.                                                   #
     #####################################################################
     # Set model hyperparameters.
-    k = None
-    model = None
+    num_question = train_matrix.shape[1]
+    # for k in [10, 50, 100, 200, 500]:
+    #     model = AutoEncoder(num_question, k)
+    #     lr = .01
+    #     lamb = 0
+    #     num_epoch = 10
+    #     train(model, lr, lamb, train_matrix, zero_train_matrix,
+    #           valid_data, num_epoch)
 
     # Set optimization hyperparameters.
-    lr = None
-    num_epoch = None
-    lamb = None
+
+    k = 500
+    lr = 0.01
+    num_epoch = 10
+    lamb = 0.01
+    model = AutoEncoder(num_question,k)
 
     train(model, lr, lamb, train_matrix, zero_train_matrix,
           valid_data, num_epoch)
+    test_acc = evaluate(model, zero_train_matrix, test_data)
+    print('test accuracy', test_acc)
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
