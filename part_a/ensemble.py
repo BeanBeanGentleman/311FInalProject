@@ -26,5 +26,3 @@ def sample(train):
 
 def evaluate():
     pass
-
-# Test
