@@ -3,6 +3,8 @@ from utils import *
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import MultipleLocator
+import warnings
+warnings.filterwarnings("error")
 
 
 def sigmoid(x):
@@ -11,7 +13,7 @@ def sigmoid(x):
     return np.exp(x) / (1 + np.exp(x))
 
 
-def neg_log_likelihood(data, theta, beta):
+def neg_log_likelihood(data, theta, beta, alpha):
     """ Compute the negative log-likelihood.
 
     You may optionally replace the function arguments to receive a matrix.
@@ -35,15 +37,18 @@ def neg_log_likelihood(data, theta, beta):
     for i, c in enumerate(correct):
         user = users[i]
         question = questions[i]
-
-        log_lklihood += c * np.log(np.exp(theta[user] - beta[question])) - np.log(1 + np.exp(theta[user] - beta[question]))
+        miu = alpha[question] * (theta[user] - beta[question])
+        try:
+            log_lklihood += c * miu - np.log(1 + np.exp(miu))
+        except RuntimeWarning:
+            import pdb; pdb.set_trace()
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
     return -log_lklihood
 
 
-def update_theta_beta(data, lr, theta, beta):
+def update_theta_beta(data, lr, theta, beta, alpha):
     """ Update theta and beta using gradient descent.
 
     You are using alternating gradient descent. Your update should look:
@@ -70,20 +75,25 @@ def update_theta_beta(data, lr, theta, beta):
 
     result_beta = [0 for z in range(len(beta))]
     result_theta = [0 for z in range(len(theta))]
+    result_alpha = [0 for z in range(len(alpha))]
     for i, c in enumerate(correct):
         user = users[i]
         question = questions[i]
-        value = c - sigmoid(theta[user] - beta[question])
-        result_beta[question] += value
-        result_theta[user] += value
+        value = c - sigmoid(alpha[question] * (theta[user] - beta[question]))
+        result_beta[question] += alpha[question] * value
+        result_theta[user] += alpha[question] * value
+        result_alpha[question] += (theta[user] - beta[question]) * value
+
     
     theta += lr * np.array(result_theta)
     beta -= lr * np.array(result_beta)
+    alpha += lr * np.array(result_alpha)
+    # import pdb; pdb.set_trace()   
 
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
-    return theta, beta
+    return theta, beta, alpha
 
 
 def irt(data, val_data, lr, iterations):
@@ -102,6 +112,7 @@ def irt(data, val_data, lr, iterations):
     # TODO: Initialize theta and beta.
     theta = np.zeros(542)
     beta = np.zeros(1774)
+    alpha = np.ones(1774)
 
     val_acc_lst = []
     train_likelihood = []
@@ -109,22 +120,22 @@ def irt(data, val_data, lr, iterations):
 
 
     for i in range(iterations):
-        neg_lld = neg_log_likelihood(data, theta=theta, beta=beta)
-        score = evaluate(data=val_data, theta=theta, beta=beta)
+        neg_lld = neg_log_likelihood(data, theta=theta, beta=beta, alpha=alpha)
+        score = evaluate(data=val_data, theta=theta, beta=beta, alpha=alpha)
         val_acc_lst.append(score)
         # print("NLLK: {} \t Score: {}".format(neg_lld, score))
 
-        neg_lld_val = neg_log_likelihood(val_data, theta=theta, beta=beta)
+        neg_lld_val = neg_log_likelihood(val_data, theta=theta, beta=beta, alpha=alpha)
         val_likelihood.append(neg_lld_val)
         train_likelihood.append(neg_lld)
 
-        theta, beta = update_theta_beta(data, lr, theta, beta)
+        theta, beta, alpha = update_theta_beta(data, lr, theta, beta, alpha)
 
     # TODO: You may change the return values to achieve what you want.
-    return theta, beta, val_acc_lst, train_likelihood, val_likelihood
+    return theta, beta, alpha, val_acc_lst, train_likelihood, val_likelihood
 
 
-def evaluate(data, theta, beta):
+def evaluate(data, theta, beta, alpha):
     """ Evaluate the model given data and return the accuracy.
     :param data: A dictionary {user_id: list, question_id: list,
     is_correct: list}
@@ -136,7 +147,7 @@ def evaluate(data, theta, beta):
     pred = []
     for i, q in enumerate(data["question_id"]):
         u = data["user_id"][i]
-        x = (theta[u] - beta[q]).sum()
+        x = (alpha[q] * (theta[u] - beta[q])).sum()
         p_a = sigmoid(x)
         pred.append(p_a >= 0.5)
     return np.sum((data["is_correct"] == np.array(pred))) \
@@ -156,22 +167,23 @@ def main():
     # code, report the validation and test accuracy.                    #
     #####################################################################
 
-    # learning_rate = [0.1, 0.05, 0.01, 0.005, 0.001]
-    # iterations = [10, 20, 30, 50, 100]
+    # learning_rate = [0.005, 0.003, 0.001]
+    # iterations = [10, 20, 30, 50, 60, 75]
     # best_acc = 0
     # best_iter = 10
     # best_lr = 0.1
     # for lr in learning_rate:
     #     for iter in iterations:
-    #         theta, beat, val_acc_lst, train_likelihood, val_likelihood = irt(train_data, val_data, lr, iter)
+    #         theta, beta, alpha, val_acc_lst, train_likelihood, val_likelihood = irt(train_data, val_data, lr, iter)
     #         if val_acc_lst[-1] > best_acc:
     #             best_acc = val_acc_lst[-1]
     #             best_iter = iter
     #             best_lr = lr
     #         print("Current lr: {}, iterations: {}, accuracy: {}".format(lr, iter, val_acc_lst[-1]))
+    # print("Best lr: {}, iterations: {}, accuracy: {}".format(best_lr, best_iter, best_acc))
     
     # Best 0.005, 30
-    theta, beta, val_acc_lst, train_likelihood, val_likelihood = irt(train_data, val_data, 0.005, 30)
+    theta, beta, alpha, val_acc_lst, train_likelihood, val_likelihood = irt(train_data, val_data, 0.005, 30)
     plt.plot(train_likelihood, label='train')
     plt.plot(val_likelihood, label='val')
     plt.xlabel('iterations number')
@@ -181,9 +193,9 @@ def main():
     ax.xaxis.set_major_locator(x_major_locator)
     plt.legend()
     plt.show()
-    test_acc = evaluate(test_data, theta, beta)
+    test_acc = evaluate(test_data, theta, beta, alpha)
     print("Test accuracy: ", test_acc)
-    val_acc = evaluate(val_data, theta, beta)
+    val_acc = evaluate(val_data, theta, beta, alpha)
     print("Validation accuracy: ", val_acc)
 
     #####################################################################
@@ -194,18 +206,18 @@ def main():
     # TODO:                                                             #
     # Implement part (d)                                                #
     #####################################################################
-    value_1 = sigmoid(theta - beta[1])
-    value_2 = sigmoid(theta - beta[5])
-    value_3 = sigmoid(theta - beta[20])
+    # value_1 = sigmoid(theta - beta[1])
+    # value_2 = sigmoid(theta - beta[5])
+    # value_3 = sigmoid(theta - beta[20])
 
-    plt.scatter(theta, value_1, label='j1')
-    plt.scatter(theta, value_2, label='j2')
-    plt.scatter(theta, value_3, label='j3')
+    # plt.scatter(theta, value_1, label='j1')
+    # plt.scatter(theta, value_2, label='j2')
+    # plt.scatter(theta, value_3, label='j3')
 
-    plt.xlabel("Theta")
-    plt.ylabel("Probability")
-    plt.legend()
-    plt.show()
+    # plt.xlabel("Theta")
+    # plt.ylabel("Probability")
+    # plt.legend()
+    # plt.show()
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
