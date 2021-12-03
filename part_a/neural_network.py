@@ -1,12 +1,14 @@
 from utils import *
-import torch
 from torch.autograd import Variable
 
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.utils.data
+
 import numpy as np
+import torch
+
 import matplotlib.pyplot as plt
 
 
@@ -55,6 +57,7 @@ class AutoEncoder(nn.Module):
 
         :return: float
         """
+
         g_w_norm = torch.norm(self.g.weight, 2) ** 2
         h_w_norm = torch.norm(self.h.weight, 2) ** 2
         return g_w_norm + h_w_norm
@@ -71,6 +74,7 @@ class AutoEncoder(nn.Module):
         # Use sigmoid activations for f and g.                              #
         #####################################################################
 
+        # 3(b)
         out = torch.sigmoid(self.g(inputs))
         out = torch.sigmoid(self.h(out))
         #####################################################################
@@ -100,9 +104,10 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
     # Define optimizers and loss function.
     optimizer = optim.SGD(model.parameters(), lr=lr)
     num_student = train_data.shape[0]
+
+    # 3(d), keep the training and validation objectives for plotiing
     training = []
     validation =[]
-    training_acc_list = []
 
     for epoch in range(0, num_epoch):
         train_loss = 0.
@@ -117,8 +122,9 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
             # Mask the target to only compute the gradient of valid entries.
             nan_mask = np.isnan(train_data[user_id].unsqueeze(0).numpy())
             target[0][nan_mask] = output[0][nan_mask]
+            # 3(e)
             loss = torch.sum((output - target) ** 2.) \
-                   + (0.5 * lamb * model.get_weight_norm())
+                   + (0.5 * lamb * model.get_weight_norm()) #regularization term
             loss.backward()
 
             train_loss += loss.item()
@@ -126,14 +132,15 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
 
         valid_acc = evaluate(model, zero_train_data, valid_data)
 
-        training.append(train_loss)
-        # training_acc_list.append(evaluate(model, zero_train_data, train_data))
-        validation.append(valid_acc)
-        # training_acc_list.append(1)
-
         print("Epoch: {} \tTraining Cost: {:.6f}\t "
               "Valid Acc: {}".format(epoch, train_loss, valid_acc))
 
+        # refresh the list with new data
+        training.append(train_loss)
+        validation.append(valid_acc)
+
+
+    # 3(d)
     plt.figure(1)
     x1 = np.arange(num_epoch)
     y1 = training
@@ -193,22 +200,27 @@ def main():
     # validation set.                                                   #
     #####################################################################
     # Set model hyperparameters.
+
+
+
+    # 3(c)
     num_question = train_matrix.shape[1]
     # for k in [10, 50, 100, 200, 500]:
     #     model = AutoEncoder(num_question, k)
     #     lr = .01
-    #     lamb = 0
     #     num_epoch = 10
+    #     lamb = 0
     #     train(model, lr, lamb, train_matrix, zero_train_matrix,
     #           valid_data, num_epoch)
 
     # Set optimization hyperparameters.
 
-    k = 500
+    # 3(e)
+    k = 400
+    model = AutoEncoder(num_question, k)
     lr = 0.01
     num_epoch = 10
-    lamb = 0.01
-    model = AutoEncoder(num_question,k)
+    lamb = 0.001
 
     train(model, lr, lamb, train_matrix, zero_train_matrix,
           valid_data, num_epoch)

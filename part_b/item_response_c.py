@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from matplotlib.pyplot import MultipleLocator
 import warnings
 warnings.filterwarnings("error")
+from datetime import datetime
+import pandas as pd
 
 g = 0.03
 
@@ -100,7 +102,7 @@ def update_theta_beta(data, lr, theta, beta, alpha):
     return theta, beta, alpha
 
 
-def irt(data, val_data, lr, iterations):
+def irt(data, val_data, lr, iterations, theta):
     """ Train IRT model.
 
     You may optionally replace the function arguments to receive a matrix.
@@ -114,7 +116,7 @@ def irt(data, val_data, lr, iterations):
     :return: (theta, beta, val_acc_lst)
     """
     # TODO: Initialize theta and beta.
-    theta = np.zeros(542)
+    # theta = np.zeros(542)
     beta = np.zeros(1774)
     alpha = np.ones(1774)
 
@@ -158,19 +160,42 @@ def evaluate(data, theta, beta, alpha):
     return np.sum((data["is_correct"] == np.array(pred))) \
            / len(data["is_correct"])
 
-
 def main():
     train_data = load_train_csv("../data")
     # You may optionally use the sparse matrix.
     sparse_matrix = load_train_sparse("../data")
     val_data = load_valid_csv("../data")
     test_data = load_public_test_csv("../data")
+    meta_data = pd.read_csv("../data/student_meta.csv")
 
-    #####################################################################
-    # TODO:                                                             #
-    # Tune learning rate and number of iterations. With the implemented #
-    # code, report the validation and test accuracy.                    #
-    #####################################################################
+    ftheta, fbeta, falpha, fval_acc_lst, ftrain_likelihood, fval_likelihood = irt(train_data, val_data, 0.005, 30, np.zeros(542))
+
+    tdf = pd.DataFrame(ftheta, columns=['theta'])
+    tdf['user_id'] = tdf.index
+
+    now = pd.Timestamp('now')
+    meta_data["data_of_birth"] = pd.to_datetime(meta_data["data_of_birth"])
+    df = meta_data.loc[:, ['user_id', 'data_of_birth']]
+    df = df[df["data_of_birth"] < datetime.now()]
+    df["data_of_birth"] = df["data_of_birth"].where(df["data_of_birth"] < now, df["data_of_birth"] -  np.timedelta64(100, 'Y'))   # 2
+    df['age'] = (now - df["data_of_birth"]).astype('<m8[Y]')
+    # df['theta_weight'] = 0.01 * (df['age'] - df['age'].mean() + 2)
+    tdf = pd.merge(tdf, df, how='left', on='user_id')
+    w_dict = tdf.groupby('age')['theta'].mean().reset_index().set_index('age').to_dict()['theta']
+    # import pdb; pdb.set_trace()
+    
+    index_lst = (meta_data[meta_data["premium_pupil"] == 1]["user_id"]).to_list()
+    input_theta = [0] * 542
+    for idx in index_lst:
+        input_theta[idx] -= 0.05
+    for index, row in df.iterrows():
+        uid = row['user_id']
+        age = row['age']
+        input_theta[uid] += w_dict[age] * 0.005
+    input_theta = np.array(input_theta)
+
+    # import pdb; pdb.set_trace()
+    
 
     # learning_rate = [0.003]
     # iterations = [50]
@@ -188,44 +213,12 @@ def main():
     # print("Best lr: {}, iterations: {}, accuracy: {}".format(best_lr, best_iter, best_acc))
     
     # Best 0.003, 40
-    theta, beta, alpha, val_acc_lst, train_likelihood, val_likelihood = irt(train_data, val_data, 0.005, 30)
-    # plt.plot(train_likelihood, label='train')
-    # plt.plot(val_likelihood, label='val')
-    # plt.xlabel('iterations number')
-    # plt.ylabel('Loglikelihood')
-    # x_major_locator = MultipleLocator(2)
-    # ax = plt.gca()
-    # ax.xaxis.set_major_locator(x_major_locator)
-    # plt.legend()
-    # plt.show()
+    theta, beta, alpha, val_acc_lst, train_likelihood, val_likelihood = irt(train_data, val_data, 0.005, 30, input_theta)
+
     test_acc = evaluate(test_data, theta, beta, alpha)
     print("Test accuracy: ", test_acc)
     val_acc = evaluate(val_data, theta, beta, alpha)
     print("Validation accuracy: ", val_acc)
-
-    #####################################################################
-    #                       END OF YOUR CODE                            #
-    #####################################################################
-
-    #####################################################################
-    # TODO:                                                             #
-    # Implement part (d)                                                #
-    #####################################################################
-    # value_1 = sigmoid(theta - beta[1])
-    # value_2 = sigmoid(theta - beta[5])
-    # value_3 = sigmoid(theta - beta[20])
-
-    # plt.scatter(theta, value_1, label='j1')
-    # plt.scatter(theta, value_2, label='j2')
-    # plt.scatter(theta, value_3, label='j3')
-
-    # plt.xlabel("Theta")
-    # plt.ylabel("Probability")
-    # plt.legend()
-    # plt.show()
-    #####################################################################
-    #                       END OF YOUR CODE                            #
-    #####################################################################
 
 
 if __name__ == "__main__":
